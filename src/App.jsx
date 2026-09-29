@@ -538,6 +538,17 @@ function f({ logout: e, user, switchToLearner }) {
               ),
             ),
           }),
+          (0, i.jsxs)(`a`, {
+            className: `portal-switch-button admin-manual-link`,
+            href: `https://sparkplus-lms-internal-manual.vercel.app/html/admin.html`,
+            target: `_blank`,
+            rel: `noopener noreferrer`,
+            title: `관리자 매뉴얼 새 탭에서 열기`,
+            children: [
+              (0, i.jsx)(Icon, { icon: BookOpen01Icon, size: 18 }),
+              (0, i.jsx)(`span`, { children: `관리자 매뉴얼` }),
+            ],
+          }),
           (0, i.jsx)(`button`, {
             className: `theme-toggle`,
             onClick: () => setTheme(theme === `light` ? `dark` : `light`),

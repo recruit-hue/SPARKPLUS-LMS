@@ -12112,6 +12112,13 @@ textarea {
 .admin-portal > .topbar .portal-switch-button {
   margin-right: 10px;
 }
+.admin-portal > .topbar .admin-manual-link {
+  margin-left: auto;
+  text-decoration: none;
+}
+.admin-portal > .topbar .admin-manual-link + .theme-toggle {
+  margin-left: 0 !important;
+}
 @media (max-width: 1080px) {
   .portal-switch-button span { display: none; }
   .portal-switch-button { width: 40px; padding: 0; }
