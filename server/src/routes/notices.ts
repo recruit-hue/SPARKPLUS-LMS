@@ -4,6 +4,42 @@ import { requireRole, requireUser } from "../auth/middleware.js";
 import { ensureNoticesSchema } from "../database/notices-schema.js";
 import type { DatabasePool } from "../database/pool.js";
 
+const allowedNoticeTags = new Set(["p","div","br","strong","b","u","a","font","ul","ol","li"]);
+function sanitizeNoticeContent(input: string) {
+  const source = input.replace(/\0/g, "").trim();
+  if (!/<[a-z!/][\s\S]*>/i.test(source)) return source;
+  const withoutActiveContent = source
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<\s*(script|style|iframe|object|embed|form|svg|math)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, "");
+  return withoutActiveContent.replace(/<[^>]*>/g, (raw) => {
+    const match = raw.match(/^<\s*(\/?)\s*([a-z0-9]+)([^>]*)>$/i);
+    if (!match) return "";
+    const closing = Boolean(match[1]);
+    const tag = (match[2] || "").toLowerCase();
+    const attrs = match[3] || "";
+    if (!allowedNoticeTags.has(tag)) return "";
+    if (closing) return tag === "br" ? "" : `</${tag}>`;
+    if (tag === "br") return "<br>";
+    if (tag === "a") {
+      const hrefMatch = attrs.match(/href\s*=\s*(["'])(.*?)\1/i);
+      const href = hrefMatch?.[2];
+      if (!href) return "<a>";
+      try {
+        const url = new URL(href);
+        if (!["http:","https:"].includes(url.protocol)) return "<a>";
+        const safeHref = url.toString().replace(/&/g,"&amp;").replace(/"/g,"&quot;");
+        return `<a href="${safeHref}" target="_blank" rel="noopener noreferrer">`;
+      } catch { return "<a>"; }
+    }
+    if (tag === "font") {
+      const color = attrs.match(/color\s*=\s*(["'])(#[0-9a-f]{6})\1/i)?.[2];
+      const size = attrs.match(/size\s*=\s*(["']?)([1-7])\1/i)?.[2];
+      return `<font${color ? ` color="${color}"` : ""}${size ? ` size="${size}"` : ""}>`;
+    }
+    return `<${tag}>`;
+  });
+}
+
 const noticeInput = z.object({
   category: z.string().trim().min(1).max(80).default("일반 공지"),
   title: z.string().trim().min(1).max(240),
@@ -13,7 +49,7 @@ const noticeInput = z.object({
   end: z.iso.date().nullable().optional(),
   status: z.enum(["DRAFT", "PUBLISHED", "ENDED"]).default("PUBLISHED"),
   important: z.boolean().default(false),
-  content: z.string().trim().min(1),
+  content: z.string().trim().min(1).max(100000).transform(sanitizeNoticeContent),
   file: z.string().trim().max(300).nullable().optional(),
 });
 const noticePatch = noticeInput.partial().refine((value) => Object.keys(value).length > 0);

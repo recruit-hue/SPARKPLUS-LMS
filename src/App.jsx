@@ -8647,6 +8647,75 @@ function emptyNoticeForm() {
   return { id: null, category: `필수 안내`, title: ``, targetType: `전체 임직원`, departments: [], course: ``, start, end: endDate.toISOString().slice(0, 10), noEnd: false, important: false, content: ``, file: `` };
 }
 
+const noticeAllowedTags = new Set([`P`,`DIV`,`BR`,`STRONG`,`B`,`U`,`A`,`FONT`,`UL`,`OL`,`LI`]);
+function sanitizeNoticeHtml(content = ``) {
+  if (typeof document === `undefined` || !/<[a-z][\s\S]*>/i.test(content)) return null;
+  const template = document.createElement(`template`);
+  template.innerHTML = content;
+  const clean = (node) => {
+    [...node.childNodes].forEach((child) => {
+      if (child.nodeType !== 1) return;
+      if (!noticeAllowedTags.has(child.tagName)) { child.replaceWith(...child.childNodes); return; }
+      const href = child.getAttribute(`href`);
+      const color = child.getAttribute(`color`);
+      const size = child.getAttribute(`size`);
+      [...child.attributes].forEach((attribute) => child.removeAttribute(attribute.name));
+      if (child.tagName === `A`) {
+        try { const url = new URL(href || ``); if ([`http:`,`https:`].includes(url.protocol)) { child.setAttribute(`href`,url.toString()); child.setAttribute(`target`,`_blank`); child.setAttribute(`rel`,`noopener noreferrer`); } }
+        catch { /* invalid links stay as plain anchors */ }
+      }
+      if (child.tagName === `FONT`) {
+        if (/^#[0-9a-f]{6}$/i.test(color || ``)) child.setAttribute(`color`,color);
+        if (/^[1-7]$/.test(size || ``)) child.setAttribute(`size`,size);
+      }
+      clean(child);
+    });
+  };
+  clean(template.content);
+  return template.innerHTML;
+}
+function noticeText(content = ``) {
+  if (typeof document === `undefined`) return content.replace(/<[^>]+>/g, ``).trim();
+  const element = document.createElement(`div`); element.innerHTML = content; return (element.textContent || ``).trim();
+}
+function NoticeContent({ content = ``, className = `` }) {
+  const html = sanitizeNoticeHtml(content);
+  if (html !== null) return <div className={`${className} notice-rich-content`} dangerouslySetInnerHTML={{ __html:html }} />;
+  return <div className={className}>{content.split(`\n`).map((line,index)=><p key={index}>{line || <br />}</p>)}</div>;
+}
+
+function NoticeRichTextEditor({ value, onChange }) {
+  const editorRef = r.useRef(null);
+  r.useEffect(() => {
+    if (!editorRef.current) return;
+    const html = sanitizeNoticeHtml(value);
+    if (html !== null) editorRef.current.innerHTML = html;
+    else editorRef.current.innerText = value || ``;
+  }, []);
+  const command = (name, commandValue = null) => {
+    editorRef.current?.focus();
+    document.execCommand(name, false, commandValue);
+    onChange(editorRef.current?.innerHTML || ``);
+  };
+  const insertLink = () => {
+    const url = window.prompt(`연결할 주소를 입력하세요.`, `https://`);
+    if (!url) return;
+    try { const parsed = new URL(url); if (![`http:`,`https:`].includes(parsed.protocol)) throw new Error(); command(`createLink`,parsed.toString()); }
+    catch { window.alert(`http:// 또는 https://로 시작하는 올바른 주소를 입력해 주세요.`); }
+  };
+  return <div className="notice-rich-editor">
+    <div className="notice-rich-toolbar" role="toolbar" aria-label="공지 내용 서식">
+      <button type="button" onMouseDown={(event)=>event.preventDefault()} onClick={()=>command(`bold`)} title="굵게"><b>B</b></button>
+      <button type="button" onMouseDown={(event)=>event.preventDefault()} onClick={()=>command(`underline`)} title="밑줄"><u>U</u></button>
+      <select aria-label="글자 크기" defaultValue="3" onChange={(event)=>command(`fontSize`,event.target.value)}><option value="2">작게</option><option value="3">보통</option><option value="4">크게</option><option value="5">아주 크게</option></select>
+      <label className="notice-color-control" title="글자색"><span>글자색</span><input type="color" defaultValue="#172033" onChange={(event)=>command(`foreColor`,event.target.value)} /></label>
+      <button type="button" onMouseDown={(event)=>event.preventDefault()} onClick={insertLink} title="하이퍼링크 삽입">🔗 링크</button>
+      <button type="button" onMouseDown={(event)=>event.preventDefault()} onClick={()=>command(`insertUnorderedList`)} title="글머리표">• 목록</button>
+    </div>
+    <div ref={editorRef} className="notice-rich-input" contentEditable suppressContentEditableWarning data-placeholder="공지 내용을 입력해주세요." onInput={(event)=>onChange(event.currentTarget.innerHTML)} />
+  </div>;
+}
+
 function T({ createSignal }) {
   const [notices, setNotices] = r.useState([]);
   const [query, setQuery] = r.useState(``);
@@ -8670,7 +8739,7 @@ function T({ createSignal }) {
   );
   const saveNotice = async () => {
     if (!form.title.trim()) return alert(`공지사항 제목을 입력해 주세요.`);
-    if (!form.content.trim()) return alert(`공지 내용을 입력해 주세요.`);
+    if (!noticeText(form.content)) return alert(`공지 내용을 입력해 주세요.`);
     const editing = Boolean(form.id);
     const targetDetails = form.targetType === `부서 선택` ? form.departments : form.targetType === `교육과정 수강자` ? [form.course].filter(Boolean) : [];
     try {
@@ -8727,7 +8796,7 @@ function NoticeEditorPage({ form, setForm, onCancel, onSave }) {
       <label>공지 제목<input value={form.title} onChange={(event) => update(`title`, event.target.value)} placeholder="공지사항 제목을 입력해주세요" /></label>
       <label className="notice-important-check"><input type="checkbox" checked={form.important} onChange={(event) => update(`important`, event.target.checked)} /><span>중요 공지로 등록</span></label>
       <fieldset><legend>게시 기간</legend><div className="notice-page-dates"><input aria-label="게시 시작일" type="date" onClick={openNativeDatePicker} value={form.start} onChange={(event) => update(`start`, event.target.value)} /><span>~</span><input aria-label="게시 종료일" type="date" onClick={openNativeDatePicker} value={form.end} onChange={(event) => update(`end`, event.target.value)} /></div></fieldset>
-      <label>공지 내용<textarea value={form.content} onChange={(event) => update(`content`, event.target.value)} placeholder="공지 내용을 입력해주세요." /></label>
+      <div className="notice-page-content-field"><span>공지 내용</span><NoticeRichTextEditor value={form.content} onChange={(value)=>update(`content`,value)} /></div>
       <div className="notice-page-actions"><button className="secondary" onClick={onCancel}>취소</button><button className="primary" onClick={onSave}>{form.id ? `저장` : `등록`}</button></div>
     </div>
   </section>;
@@ -8739,7 +8808,7 @@ function NoticeDetailPage({ notice, onBack, onEdit, onDelete }) {
     <button className="notice-back-link" onClick={onBack}><Icon icon={ArrowLeft01Icon} size={16} />목록으로</button>
     <article className="notice-document">
       <header>{notice.important && <NoticePin label />}<h1>{notice.title}</h1><div><time>{notice.start?.replaceAll(`-`, `.`)}</time><span>조회수 {notice.views.toLocaleString()}</span></div></header>
-      <div className="notice-document-body">{(notice.content || ``).split(`\n`).map((line, index) => <p key={index}>{line || <br />}</p>)}</div>
+      <NoticeContent className="notice-document-body" content={notice.content || ``} />
     </article>
     <div className="notice-detail-actions"><button className="secondary" onClick={onEdit}><Icon icon={Edit02Icon} size={17} />수정</button><button className="notice-danger-outline" onClick={onDelete}><Icon icon={Delete02Icon} size={17} />삭제</button></div>
   </section>;
@@ -8768,7 +8837,7 @@ function NoticeEditorModal({ form, setForm, onClose, onPreview, onDraft, onPubli
 function NoticeReadingModal({ notice, preview = false, onClose, onEdit, onEnd }) {
   return <div className="overlay center" onMouseDown={onClose}><article className="notice-reading-modal" onMouseDown={(event) => event.stopPropagation()}>
     <header><span>{preview ? `사용자 화면 미리보기` : `공지 보기`}</span><button onClick={onClose}><Icon icon={Cancel01Icon} /></button></header>
-    <div className="notice-reading-content">{notice.important && <NoticePin label />}<h1>{notice.title || `제목 없는 공지`}</h1><div className="notice-reading-meta"><span>게시 기간 {notice.start} ~ {notice.noEnd || !notice.end ? `계속` : notice.end}</span><span>게시 대상 {notice.target || `전체 임직원`}</span><span>조회 {notice.views || 0}</span></div><div className="notice-reading-body">{(notice.content || `공지 내용이 입력되지 않았습니다.`).split(`\n`).map((line, index) => <p key={index}>{line || <br />}</p>)}</div>{notice.file && <div className="notice-reading-file"><b>첨부파일</b><button><Icon icon={File01Icon} /><span>{notice.file}</span><Icon icon={Download01Icon} /></button></div>}</div>
+    <div className="notice-reading-content">{notice.important && <NoticePin label />}<h1>{notice.title || `제목 없는 공지`}</h1><div className="notice-reading-meta"><span>게시 기간 {notice.start} ~ {notice.noEnd || !notice.end ? `계속` : notice.end}</span><span>게시 대상 {notice.target || `전체 임직원`}</span><span>조회 {notice.views || 0}</span></div><NoticeContent className="notice-reading-body" content={notice.content || `공지 내용이 입력되지 않았습니다.`} />{notice.file && <div className="notice-reading-file"><b>첨부파일</b><button><Icon icon={File01Icon} /><span>{notice.file}</span><Icon icon={Download01Icon} /></button></div>}</div>
     {!preview && <footer>{onEdit && <button className="secondary" onClick={onEdit}>수정</button>}{onEnd && <button className="primary" onClick={onEnd}>게시 종료</button>}</footer>}
   </article></div>;
 }
@@ -11790,7 +11859,7 @@ function ae({ notice: e, go: t, notices = j }) {
           (0, i.jsxs)(`div`, {
             className: `notice-detail-body`,
             children: [
-              (0, i.jsx)(`p`, { children: e.content }),
+              (0, i.jsx)(NoticeContent, { content: e.content }),
               (0, i.jsx)(`p`, {
                 children: `교육 일정과 학습 진행에 착오가 없도록 내용을 확인해 주시기 바랍니다. 문의 사항은 인재개발팀으로 전달해 주세요.`,
               }),
