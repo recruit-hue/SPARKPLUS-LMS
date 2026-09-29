@@ -16685,6 +16685,15 @@ html[data-theme="dark"] .fixed-badge-card {
 }
 
 /* Shared administrator filter toolbar and status system */
+.results-detail-modal .note.warn {
+  color: #5b3a00 !important;
+}
+.results-detail-modal .note.warn strong {
+  color: #5b3a00 !important;
+}
+.results-detail-modal .note.warn p {
+  color: #6a4a12 !important;
+}
 .manual-complete-open{min-width:76px;padding:8px 11px;border:1px solid #efb15a;border-radius:9px;background:#fff8e9;color:#9a5a00;font-size:12px;font-weight:750;white-space:nowrap}.manual-complete-open:hover{background:#ffefc9}.manual-complete-done{color:#6f7b8b;font-size:12px}.manual-completion-summary{display:grid;gap:5px;padding:16px;border:1px solid #dce4ef;border-radius:14px;background:#f7f9fc}.manual-completion-summary span{color:#748094;font-size:11px}.manual-completion-summary b{color:#243146;font-size:16px}.manual-completion-summary small{color:#66758a}.manual-completion-reason{display:grid;gap:8px;margin-top:18px}.manual-completion-reason>span{font-size:13px;font-weight:750}.manual-completion-reason>span b{color:#d84343}.manual-completion-reason textarea{min-height:120px;padding:13px;border:1px solid #ccd6e4;border-radius:12px;resize:vertical;font:inherit;line-height:1.55}.manual-completion-reason textarea:focus{outline:2px solid rgba(49,130,246,.2);border-color:#3182f6}.manual-completion-reason small{text-align:right;color:#7d8999}.results-detail-modal .note.warn{margin:16px 0;padding:14px;border-left:4px solid #e7a43b;border-radius:11px;background:#fff7e8}.results-detail-modal .note.warn p{margin:5px 0 0;color:#705420;font-size:12px;line-height:1.6}html[data-theme="dark"] .manual-complete-open{border-color:#8d6a35;background:#3b3120;color:#ffd28a}html[data-theme="dark"] .manual-completion-summary{border-color:#3b4c62;background:#1d2b3d}html[data-theme="dark"] .manual-completion-summary b{color:#eef5fd}html[data-theme="dark"] .manual-completion-reason textarea{border-color:#42536b;background:#172437;color:#eef5fd}
 .admin-portal :is(.course-card-filter, .learner-management-filter, .learner-filter-fields, .results-filter, .google-form-admin-toolbar, .analysis-filter-bar, .performance-filter-panel, .notice-admin-filters) {
   display: flex !important;
