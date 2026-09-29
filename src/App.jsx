@@ -1411,6 +1411,7 @@ function CourseEditorV2({ selected, onBack, isNew = false }) {
   const [editingIndex, setEditingIndex] = r.useState(null);
   const [activeSection, setActiveSection] = r.useState(`basic`);
   const [dirty, setDirty] = r.useState(false);
+  const [saving, setSaving] = r.useState(false);
   const [coursePreview, setCoursePreview] = r.useState(false);
   const [draggingLesson, setDraggingLesson] = r.useState(null);
   const [assignmentSearch, setAssignmentSearch] = r.useState(``);
@@ -1578,6 +1579,7 @@ function CourseEditorV2({ selected, onBack, isNew = false }) {
     });
   };
   const save = async () => {
+    if (saving) return;
     if (!form.title.trim() || !form.category) return alert(`강의 제목과 분야를 입력해 주세요.`);
     const assignments = [
       ...(form.assignmentModes.includes(`all`) ? [{ type:`ALL`, targetId:null }] : []),
@@ -1595,10 +1597,12 @@ function CourseEditorV2({ selected, onBack, isNew = false }) {
         attachmentDriveFileId:item.attachmentDriveFileId || null, goals:item.goals || ``, contents:item.contents || ``, completionThreshold:item.videoType === `DRIVE` ? 90 : 60,
         quiz:(item.quizEnabled ? item.quiz : []).slice(0,1).map((question) => { const options=[...(question.options || [])]; while(options.length<4) options.push(`선택지 ${options.length+1}`); return { id:question.id, question:question.question, options:options.slice(0,4), correctOption:Math.min(3,Number.isInteger(question.correctOption) ? question.correctOption : 0), explanation:question.explanation || `` }; }) })), assignments,
     };
+    setSaving(true);
     try {
       const saved=await apiRequest(isNew ? `/api/v1/courses` : `/api/v1/courses/${selected.id}`, { method:isNew ? `POST` : `PUT`, body:JSON.stringify(payload) });
       Object.assign(selected,saved); setDirty(false); showAdminToast(isNew ? `교육과정과 배정 대상이 등록되었습니다.` : `교육과정과 배정 정보가 저장되었습니다.`); if(isNew) onBack();
-    } catch(requestError) { showAdminToast(requestError.message === `VALIDATION_ERROR` ? `필수 정보와 퀴즈 선택지를 확인해주세요.` : `교육과정을 저장하지 못했습니다.`, `error`); }
+    } catch(requestError) { showAdminToast(requestError.message === `VALIDATION_ERROR` ? `필수 정보와 퀴즈 선택지를 확인해주세요.` : `교육과정을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.`, `error`); }
+    finally { setSaving(false); }
   };
   const remove = () => {
     setCourseDeleteOpen(true);
@@ -1873,7 +1877,7 @@ function CourseEditorV2({ selected, onBack, isNew = false }) {
           </div>
         )}
       </section>
-      <div className="course-editor-final-actions course-builder-savebar"><div><button className="primary" onClick={save}>{isNew ? `교육과정 등록` : `저장`}</button></div></div>
+      <div className="course-editor-final-actions course-builder-savebar"><div><button className="primary" disabled={saving} onClick={save}>{saving ? `저장 중...` : isNew ? `교육과정 등록` : `저장`}</button></div></div>
       {lesson && (
         <div
           className="overlay"
