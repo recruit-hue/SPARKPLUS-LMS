@@ -3976,8 +3976,8 @@ function AdminLearningStatusPage() {
     </tbody></table></div>
     {manualCompletion && <ResultsDetailModal title="관리자 수동 수료 처리" subtitle={manualCompletion.name} onClose={() => !manualSubmitting && setManualCompletion(null)}>
       <div className="manual-completion-summary"><span>교육과정</span><b>{manualCompletion.course}</b><small>현재 진도 {Number(manualCompletion.progress || 0)}% · {Number(manualCompletion.completedLessons || 0)}/{Number(manualCompletion.totalLessons || 0)}차시 완료</small></div>
-      <div className="note warn"><strong>예외 처리 기능</strong><p>학습자가 실제로 모든 학습을 마쳤으나 시스템 오류로 완료되지 않은 경우에만 사용하세요. 수료 상태·진도율·리워드·수료증이 즉시 반영되며 처리자와 사유가 감사 기록에 남습니다.</p></div>
-      <label className="manual-completion-reason"><span>처리 사유 <b>*</b></span><textarea value={manualReason} onChange={(event) => setManualReason(event.target.value)} maxLength={1000} placeholder="오류 확인 내용과 실제 수강 완료 근거를 10자 이상 입력하세요." autoFocus /><small>{manualReason.trim().length}/10자 이상</small></label>
+      <div className="note warn"><strong>관리자 예외 수료</strong><p>미완료 상태라도 오프라인 이수, 대체교육, 시스템 오류 또는 운영상 승인된 사유가 있으면 관리자가 수료 처리할 수 있습니다. 수료 상태·진도율·리워드·수료증이 즉시 반영되며 처리자와 사유가 감사 기록에 남습니다.</p></div>
+      <label className="manual-completion-reason"><span>처리 사유 <b>*</b></span><textarea value={manualReason} onChange={(event) => setManualReason(event.target.value)} maxLength={1000} placeholder="예: 오프라인 대체교육 이수 확인(승인자 홍길동, 2026.09.29)" autoFocus /><small>{manualReason.trim().length}/10자 이상</small></label>
       <div className="completion-modal-actions"><button type="button" disabled={manualSubmitting} onClick={() => setManualCompletion(null)}>취소</button><button type="button" className="final-process" disabled={manualSubmitting || manualReason.trim().length < 10} onClick={submitManualCompletion}>{manualSubmitting ? `처리 중...` : `수동 수료 확정`}</button></div>
     </ResultsDetailModal>}
   </section>;
