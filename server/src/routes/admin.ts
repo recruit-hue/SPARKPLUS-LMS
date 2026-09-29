@@ -175,7 +175,7 @@ export function createAdminRouter(pool: DatabasePool, config?: AppConfig) {
   });
 
   router.post("/enrollments/:id/manual-complete", async (request, response, next) => {
-    const parsed = z.object({ reason: z.string().trim().min(10).max(1000) }).safeParse(request.body);
+    const parsed = z.object({ reason: z.string().trim().max(1000).optional().default("") }).safeParse(request.body);
     if (!parsed.success) return invalid(response, parsed.error);
     const client = await pool.connect();
     try {
@@ -191,11 +191,11 @@ export function createAdminRouter(pool: DatabasePool, config?: AppConfig) {
       await client.query(`INSERT INTO certificates(enrollment_id,certificate_number) VALUES($1,$2) ON CONFLICT(enrollment_id) DO NOTHING`, [request.params.id, certificateNumber]);
       await client.query(`INSERT INTO audit_logs(actor_user_id,action,target_type,target_id,before_data,after_data,ip_address)
         VALUES($1,'ENROLLMENT_MANUALLY_COMPLETED','ENROLLMENT',$2,$3,$4,$5)`, [request.currentUser!.id, request.params.id,
-        JSON.stringify(current.rows[0]), JSON.stringify({ ...completed.rows[0], reason:parsed.data.reason, userName:current.rows[0].userName, courseTitle:current.rows[0].courseTitle }), request.ip || null]);
+        JSON.stringify(current.rows[0]), JSON.stringify({ ...completed.rows[0], reason:parsed.data.reason || "관리자 판단에 따른 수동 수료", userName:current.rows[0].userName, courseTitle:current.rows[0].courseTitle }), request.ip || null]);
       await client.query("COMMIT");
       try { await awardReward(pool,{userId:current.rows[0].userId,enrollmentId:request.params.id,activityType:"COURSE_COMPLETE",sourceKey:`course:${request.params.id}`,description:`관리자 수동 수료: ${current.rows[0].courseTitle}`}); }
       catch (rewardError) { console.error("[admin/manual-complete] reward failed", { enrollmentId:request.params.id,rewardError }); }
-      response.json({ data:{...completed.rows[0],certificateNumber,manual:true,reason:parsed.data.reason},error:null });
+      response.json({ data:{...completed.rows[0],certificateNumber,manual:true,reason:parsed.data.reason || null},error:null });
     } catch (error) {
       await client.query("ROLLBACK").catch(()=>undefined);
       next(error);

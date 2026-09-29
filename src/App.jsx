@@ -3942,7 +3942,7 @@ function AdminLearningStatusPage() {
   const applyFilters = () => setFilters({ start: range.start, end: range.end, type, query: query.trim() });
   const openManualCompletion = (row) => { setManualCompletion(row); setManualReason(``); };
   const submitManualCompletion = async () => {
-    if (!manualCompletion || manualReason.trim().length < 10) return;
+    if (!manualCompletion) return;
     setManualSubmitting(true);
     try {
       await apiRequest(`/api/v1/admin/enrollments/${manualCompletion.enrollmentId}/manual-complete`, { method:`POST`, body:JSON.stringify({ reason:manualReason.trim() }) });
@@ -3977,8 +3977,8 @@ function AdminLearningStatusPage() {
     {manualCompletion && <ResultsDetailModal title="관리자 수동 수료 처리" subtitle={manualCompletion.name} onClose={() => !manualSubmitting && setManualCompletion(null)}>
       <div className="manual-completion-summary"><span>교육과정</span><b>{manualCompletion.course}</b><small>현재 진도 {Number(manualCompletion.progress || 0)}% · {Number(manualCompletion.completedLessons || 0)}/{Number(manualCompletion.totalLessons || 0)}차시 완료</small></div>
       <div className="note warn"><strong>관리자 예외 수료</strong><p>미완료 상태라도 오프라인 이수, 대체교육, 시스템 오류 또는 운영상 승인된 사유가 있으면 관리자가 수료 처리할 수 있습니다. 수료 상태·진도율·리워드·수료증이 즉시 반영되며 처리자와 사유가 감사 기록에 남습니다.</p></div>
-      <label className="manual-completion-reason"><span>처리 사유 <b>*</b></span><textarea value={manualReason} onChange={(event) => setManualReason(event.target.value)} maxLength={1000} placeholder="예: 오프라인 대체교육 이수 확인(승인자 홍길동, 2026.09.29)" autoFocus /><small>{manualReason.trim().length}/10자 이상</small></label>
-      <div className="completion-modal-actions"><button type="button" disabled={manualSubmitting} onClick={() => setManualCompletion(null)}>취소</button><button type="button" className="final-process" disabled={manualSubmitting || manualReason.trim().length < 10} onClick={submitManualCompletion}>{manualSubmitting ? `처리 중...` : `수동 수료 확정`}</button></div>
+      <label className="manual-completion-reason"><span>처리 사유 <small>(선택)</small></span><textarea value={manualReason} onChange={(event) => setManualReason(event.target.value)} maxLength={1000} placeholder="예: 오프라인 대체교육 이수 확인" autoFocus /><small>{manualReason.length}/1000자</small></label>
+      <div className="completion-modal-actions"><button type="button" disabled={manualSubmitting} onClick={() => setManualCompletion(null)}>취소</button><button type="button" className="final-process" disabled={manualSubmitting} onClick={submitManualCompletion}>{manualSubmitting ? `처리 중...` : `수동 수료 확정`}</button></div>
     </ResultsDetailModal>}
   </section>;
 }
