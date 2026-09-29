@@ -7,6 +7,7 @@ import type { OrganizationRecord } from "../types.js";
 import type { AppConfig } from "../config.js";
 import { syncGoogleArchive } from "../google/archive.js";
 import { ensureLearningSchema } from "../database/learning-schema.js";
+import { awardReward } from "./rewards.js";
 
 const companyEmail = z.string().trim().toLowerCase().email().refine((value) => value.endsWith("@sparkplus.co"));
 const userInput = z.object({
@@ -171,6 +172,34 @@ export function createAdminRouter(pool: DatabasePool, config?: AppConfig) {
       ]);
       response.json({ data: { summary: summary.rows[0], rows: rows.rows }, error: null });
     } catch (error) { next(error); }
+  });
+
+  router.post("/enrollments/:id/manual-complete", async (request, response, next) => {
+    const parsed = z.object({ reason: z.string().trim().min(10).max(1000) }).safeParse(request.body);
+    if (!parsed.success) return invalid(response, parsed.error);
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const current = await client.query(`SELECT e.id,e.user_id AS "userId",e.status,e.progress,e.completed_at AS "completedAt",
+        u.name AS "userName",c.title AS "courseTitle" FROM enrollments e JOIN users u ON u.id=e.user_id
+        JOIN courses c ON c.id=e.course_id WHERE e.id=$1 AND e.status<>'CANCELLED' FOR UPDATE`, [request.params.id]);
+      if (!current.rowCount) { await client.query("ROLLBACK"); return response.status(404).json({ data:null,error:{code:"ENROLLMENT_NOT_FOUND"} }); }
+      if (current.rows[0].status === "COMPLETED") { await client.query("ROLLBACK"); return response.status(409).json({ data:null,error:{code:"ALREADY_COMPLETED"} }); }
+      const completed = await client.query(`UPDATE enrollments SET status='COMPLETED',progress=100,completed_at=now()
+        WHERE id=$1 RETURNING id,status,progress,completed_at AS "completedAt"`, [request.params.id]);
+      const certificateNumber = `SPARKPLUS-${new Date().getFullYear()}-${request.params.id.slice(0,8).toUpperCase()}`;
+      await client.query(`INSERT INTO certificates(enrollment_id,certificate_number) VALUES($1,$2) ON CONFLICT(enrollment_id) DO NOTHING`, [request.params.id, certificateNumber]);
+      await client.query(`INSERT INTO audit_logs(actor_user_id,action,target_type,target_id,before_data,after_data,ip_address)
+        VALUES($1,'ENROLLMENT_MANUALLY_COMPLETED','ENROLLMENT',$2,$3,$4,$5)`, [request.currentUser!.id, request.params.id,
+        JSON.stringify(current.rows[0]), JSON.stringify({ ...completed.rows[0], reason:parsed.data.reason, userName:current.rows[0].userName, courseTitle:current.rows[0].courseTitle }), request.ip || null]);
+      await client.query("COMMIT");
+      try { await awardReward(pool,{userId:current.rows[0].userId,enrollmentId:request.params.id,activityType:"COURSE_COMPLETE",sourceKey:`course:${request.params.id}`,description:`관리자 수동 수료: ${current.rows[0].courseTitle}`}); }
+      catch (rewardError) { console.error("[admin/manual-complete] reward failed", { enrollmentId:request.params.id,rewardError }); }
+      response.json({ data:{...completed.rows[0],certificateNumber,manual:true,reason:parsed.data.reason},error:null });
+    } catch (error) {
+      await client.query("ROLLBACK").catch(()=>undefined);
+      next(error);
+    } finally { client.release(); }
   });
 
   router.get("/users", async (_request, response, next) => {

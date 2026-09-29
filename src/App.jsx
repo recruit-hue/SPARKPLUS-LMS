@@ -3921,6 +3921,10 @@ function AdminLearningStatusPage() {
   const [loading, setLoading] = r.useState(true);
   const [error, setError] = r.useState(``);
   const [excludeCompleted, setExcludeCompleted] = r.useState(false);
+  const [manualCompletion, setManualCompletion] = r.useState(null);
+  const [manualReason, setManualReason] = r.useState(``);
+  const [manualSubmitting, setManualSubmitting] = r.useState(false);
+  const [refreshKey, setRefreshKey] = r.useState(0);
   r.useEffect(() => {
     let active = true;
     setLoading(true); setError(``);
@@ -3929,13 +3933,24 @@ function AdminLearningStatusPage() {
       .catch((requestError) => { if (active) { setData({ summary: {}, rows: [] }); setError(requestError?.message || `학습 현황을 불러오지 못했습니다.`); } })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [filters]);
+  }, [filters, refreshKey]);
   const summary = data.summary || {};
   const rows = data.rows || [];
   const visibleRows = filters.type === `ENROLLED` && excludeCompleted
     ? rows.filter((row) => !row.completedAt && row.status !== `COMPLETED`)
     : rows;
   const applyFilters = () => setFilters({ start: range.start, end: range.end, type, query: query.trim() });
+  const openManualCompletion = (row) => { setManualCompletion(row); setManualReason(``); };
+  const submitManualCompletion = async () => {
+    if (!manualCompletion || manualReason.trim().length < 10) return;
+    setManualSubmitting(true);
+    try {
+      await apiRequest(`/api/v1/admin/enrollments/${manualCompletion.enrollmentId}/manual-complete`, { method:`POST`, body:JSON.stringify({ reason:manualReason.trim() }) });
+      showAdminToast(`${manualCompletion.name}님의 과정이 관리자 수동 수료 처리되었습니다.`);
+      setManualCompletion(null); setManualReason(``); setRefreshKey((value) => value + 1);
+    } catch (requestError) { showAdminToast(requestError?.message || `수동 수료 처리에 실패했습니다.`, `error`); }
+    finally { setManualSubmitting(false); }
+  };
   return <section className="learning-status-page">
     <div className="learning-status-toolbar">
       <div className="learning-status-tabs" role="tablist" aria-label="학습 현황 유형">
@@ -3954,11 +3969,17 @@ function AdminLearningStatusPage() {
     </div>
     <div className="learning-status-result-head"><div><div className="learning-status-result-title"><h2>{filters.type === `COMPLETED` ? `학습 완료` : `수강 신청`} 상세</h2>{filters.type === `ENROLLED` && <button type="button" className={excludeCompleted ? `active` : ``} onClick={() => setExcludeCompleted((current) => !current)}><Icon icon={CheckmarkCircle02Icon} size={15} />완료건 제외</button>}</div><p>{filters.start.replaceAll(`-`, `.`)} ~ {filters.end.replaceAll(`-`, `.`)} · 총 {visibleRows.length.toLocaleString()}건{filters.type === `ENROLLED` && excludeCompleted ? ` (완료 제외)` : ``}</p></div><span>관리자 홈·학습 리워드와 동일한 수강/포인트 원천 데이터를 사용합니다.</span></div>
     {error && <div className="inline-error">{error}</div>}
-    <div className="table-wrap learning-status-table-wrap"><table className="learning-status-table"><thead><tr><th>학습자</th><th>조직</th><th>교육과정</th><th>구분</th><th>진도/차시</th><th>{filters.type === `COMPLETED` ? `완료일` : `신청일`}</th><th>리워드</th></tr></thead><tbody>
-      {loading && <tr><td colSpan="7" className="table-empty">학습 현황을 불러오고 있습니다.</td></tr>}
-      {!loading && !visibleRows.length && <tr><td colSpan="7" className="table-empty">선택한 조건의 학습 기록이 없습니다.</td></tr>}
-      {!loading && visibleRows.map((row) => <tr key={row.enrollmentId}><td><b>{row.name}</b><small>{row.employeeNumber} · {row.email}</small></td><td>{row.organization}</td><td><b>{row.course}</b><small>{row.category}</small></td><td><span className={row.required ? `status-chip required` : `status-chip`}>{row.required ? `필수` : `선택`}</span></td><td><b>{Number(row.progress || 0)}%</b><small>{Number(row.completedLessons || 0)}/{Number(row.totalLessons || 0)}차시</small></td><td>{new Date(filters.type === `COMPLETED` ? row.completedAt : row.enrolledAt).toLocaleString(`ko-KR`, { year:`numeric`, month:`2-digit`, day:`2-digit`, hour:`2-digit`, minute:`2-digit` })}</td><td><b>{Number(row.rewardPoints || 0).toLocaleString()}P</b></td></tr>)}
+    <div className="table-wrap learning-status-table-wrap"><table className="learning-status-table"><thead><tr><th>학습자</th><th>조직</th><th>교육과정</th><th>구분</th><th>진도/차시</th><th>{filters.type === `COMPLETED` ? `완료일` : `신청일`}</th><th>리워드</th><th>관리</th></tr></thead><tbody>
+      {loading && <tr><td colSpan="8" className="table-empty">학습 현황을 불러오고 있습니다.</td></tr>}
+      {!loading && !visibleRows.length && <tr><td colSpan="8" className="table-empty">선택한 조건의 학습 기록이 없습니다.</td></tr>}
+      {!loading && visibleRows.map((row) => <tr key={row.enrollmentId}><td><b>{row.name}</b><small>{row.employeeNumber} · {row.email}</small></td><td>{row.organization}</td><td><b>{row.course}</b><small>{row.category}</small></td><td><span className={row.required ? `status-chip required` : `status-chip`}>{row.required ? `필수` : `선택`}</span></td><td><b>{Number(row.progress || 0)}%</b><small>{Number(row.completedLessons || 0)}/{Number(row.totalLessons || 0)}차시</small></td><td>{new Date(filters.type === `COMPLETED` ? row.completedAt : row.enrolledAt).toLocaleString(`ko-KR`, { year:`numeric`, month:`2-digit`, day:`2-digit`, hour:`2-digit`, minute:`2-digit` })}</td><td><b>{Number(row.rewardPoints || 0).toLocaleString()}P</b></td><td>{filters.type === `ENROLLED` && row.status !== `COMPLETED` ? <button type="button" className="manual-complete-open" onClick={() => openManualCompletion(row)}>수동 수료</button> : <span className="manual-complete-done">{row.status === `COMPLETED` ? `수료 완료` : `-`}</span>}</td></tr>)}
     </tbody></table></div>
+    {manualCompletion && <ResultsDetailModal title="관리자 수동 수료 처리" subtitle={manualCompletion.name} onClose={() => !manualSubmitting && setManualCompletion(null)}>
+      <div className="manual-completion-summary"><span>교육과정</span><b>{manualCompletion.course}</b><small>현재 진도 {Number(manualCompletion.progress || 0)}% · {Number(manualCompletion.completedLessons || 0)}/{Number(manualCompletion.totalLessons || 0)}차시 완료</small></div>
+      <div className="note warn"><strong>예외 처리 기능</strong><p>학습자가 실제로 모든 학습을 마쳤으나 시스템 오류로 완료되지 않은 경우에만 사용하세요. 수료 상태·진도율·리워드·수료증이 즉시 반영되며 처리자와 사유가 감사 기록에 남습니다.</p></div>
+      <label className="manual-completion-reason"><span>처리 사유 <b>*</b></span><textarea value={manualReason} onChange={(event) => setManualReason(event.target.value)} maxLength={1000} placeholder="오류 확인 내용과 실제 수강 완료 근거를 10자 이상 입력하세요." autoFocus /><small>{manualReason.trim().length}/10자 이상</small></label>
+      <div className="completion-modal-actions"><button type="button" disabled={manualSubmitting} onClick={() => setManualCompletion(null)}>취소</button><button type="button" className="final-process" disabled={manualSubmitting || manualReason.trim().length < 10} onClick={submitManualCompletion}>{manualSubmitting ? `처리 중...` : `수동 수료 확정`}</button></div>
+    </ResultsDetailModal>}
   </section>;
 }
 
