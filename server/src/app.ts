@@ -23,7 +23,7 @@ export function createApp(config: AppConfig, pool: DatabasePool, options: AppOpt
 
   app.set("trust proxy", config.NODE_ENV === "production" ? 1 : 0);
   app.use(cors({ origin: config.APP_ORIGIN, credentials: true }));
-  app.use(express.json({ limit: "1mb" }));
+  app.use(express.json({ limit: "4mb" }));
   app.use((request, response, next) => {
     if (!request.path.startsWith("/api")) return next();
     const startedAt = Date.now();
@@ -102,6 +102,9 @@ export function createApp(config: AppConfig, pool: DatabasePool, options: AppOpt
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
     }));
+    if ((error as any)?.type === "entity.too.large") {
+      return response.status(413).json({ data: null, error: { code: "PAYLOAD_TOO_LARGE" } });
+    }
     response.status(500).json({ data: null, error: { code: "INTERNAL_SERVER_ERROR" } });
   };
   app.use(errorHandler);

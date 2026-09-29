@@ -77,6 +77,34 @@ function WishlistHeart({ filled = false, size = 27 }) {
     />
   </svg>;
 }
+function prepareCourseThumbnail(file) {
+  const readFile = () => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ``));
+    reader.onerror = () => reject(new Error(`THUMBNAIL_READ_FAILED`));
+    reader.readAsDataURL(file);
+  });
+  if (file.size <= 500 * 1024) return readFile();
+  return readFile().then((source) => new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      const maxWidth = 1600;
+      const maxHeight = 900;
+      const scale = Math.min(1, maxWidth / image.width, maxHeight / image.height);
+      const canvas = document.createElement(`canvas`);
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      const context = canvas.getContext(`2d`);
+      if (!context) return reject(new Error(`THUMBNAIL_PROCESS_FAILED`));
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const optimized = canvas.toDataURL(`image/jpeg`, 0.84);
+      if (optimized.length > 3 * 1024 * 1024) return reject(new Error(`THUMBNAIL_TOO_LARGE`));
+      resolve(optimized);
+    };
+    image.onerror = () => reject(new Error(`THUMBNAIL_PROCESS_FAILED`));
+    image.src = source;
+  }));
+}
 function userLevelLabel(level = ``) {
   const number = String(level).match(/\d+/)?.[0];
   return number ? `LV.${number}` : level;
@@ -1597,12 +1625,14 @@ function CourseEditorV2({ selected, onBack, isNew = false }) {
             <input
               type="file"
               accept="image/*"
-              onChange={(event) => {
+              onChange={async (event) => {
                 const file = event.target.files?.[0];
                 if (file) {
-                  const reader = new FileReader();
-                  reader.onload = () => update(`thumbnail`, reader.result);
-                  reader.readAsDataURL(file);
+                  try {
+                    update(`thumbnail`, await prepareCourseThumbnail(file));
+                  } catch {
+                    showAdminToast(`이미지를 처리하지 못했습니다. 다른 이미지로 다시 시도해 주세요.`, `error`);
+                  }
                 }
               }}
             />
