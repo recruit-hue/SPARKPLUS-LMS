@@ -6677,6 +6677,14 @@ b {
   height: 205px !important;
   border-radius: 21px !important;
 }
+.home-continue-thumbnail {
+  display: block;
+  width: 100%;
+  height: 205px;
+  border-radius: 21px;
+  object-fit: cover;
+  object-position: center;
+}
 .home-continue-content > div:last-child > small {
   color: #6b7684;
   font-size: 12px;
@@ -7031,7 +7039,8 @@ html[data-theme="dark"] .home-badge-main > span {
   .home-continue-content {
     grid-template-columns: 1fr;
   }
-  .home-continue-content > .course-visual {
+  .home-continue-content > .course-visual,
+  .home-continue-thumbnail {
     height: 170px !important;
   }
   .home-popular-section,

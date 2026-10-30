@@ -9878,7 +9878,11 @@ function L({ courses: e, go: t, notices = [], user = CURRENT_USER }) {
             이어서 학습하기
           </div>
           {n ? <div className="home-continue-content">
-            <J accent={n.accent} label={n.category} />
+            {n.thumbnail ? (
+              <img className="home-continue-thumbnail" src={n.thumbnail} alt={`${n.title} 썸네일`} />
+            ) : (
+              <J accent={n.accent} label={n.category} />
+            )}
             <div>
               <small>
                 {n.category} · {n.level}
