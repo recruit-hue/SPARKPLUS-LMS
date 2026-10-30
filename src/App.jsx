@@ -10449,7 +10449,11 @@ function Y({ course: e, go: t, wishlisted: controlledWishlisted, onWishlistChang
   return (
     <article className="course-card toss-card">
       <div className="visual-wrap">
-        <J accent={e.accent} label={e.category} />
+        {e.thumbnail ? (
+          <img className="course-card-thumbnail" src={e.thumbnail} alt={`${e.title} 썸네일`} />
+        ) : (
+          <J accent={e.accent} label={e.category} />
+        )}
         <CourseStatusBadge status={e.status} className="status-ribbon" />
         <button
           type="button"
